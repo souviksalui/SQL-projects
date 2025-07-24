@@ -235,7 +235,7 @@ select a.cust_id,a.cust_name,a.points as before_points , b.points as after_point
 from ctebefore a inner join cteafter b on a.cust_id = b.cust_id;
 
 
--- coupons for members(after join) for combo products (2,6) (4,9) (5,10) ordered on same date only
+-- coupons for members(after join) for combo products of menu_id like (2,6) (4,9) (5,10) ordered on same date only
 
 with ctecoupon as
 (
@@ -263,4 +263,46 @@ from ctecoupon group by cust_name, order_date;
 -- join all tables
 -- ranking of the tables
 -- interval wise sales analytics
+
+WITH ctecoupon AS (
+    SELECT 
+        s.cust_id,
+        m.cust_name, 
+        s.order_date, 
+        s.menu_id
+    FROM sales s 
+    INNER JOIN members m ON s.cust_id = m.cust_id
+    INNER JOIN menu mm ON s.menu_id = mm.menu_id
+    WHERE s.order_date >= m.join_date
+),
+grouped_orders AS (
+    SELECT 
+        cust_name,
+        order_date,
+        -- Aggregate menu_ids into a string or use conditional logic
+        SUM(CASE WHEN menu_id = 2 THEN 1 ELSE 0 END) AS has_2,
+        SUM(CASE WHEN menu_id = 6 THEN 1 ELSE 0 END) AS has_6,
+        SUM(CASE WHEN menu_id = 4 THEN 1 ELSE 0 END) AS has_4,
+        SUM(CASE WHEN menu_id = 9 THEN 1 ELSE 0 END) AS has_9,
+        SUM(CASE WHEN menu_id = 5 THEN 1 ELSE 0 END) AS has_5,
+        SUM(CASE WHEN menu_id = 10 THEN 1 ELSE 0 END) AS has_10
+    FROM ctecoupon
+    WHERE menu_id IN (2, 6, 4, 9, 5, 10)
+    GROUP BY cust_name, order_date
+)
+
+SELECT 
+    cust_name, 
+    order_date,
+    CASE 
+        WHEN has_2 > 0 AND has_6 > 0 THEN 'YES'
+        WHEN has_4 > 0 AND has_9 > 0 THEN 'YES'
+        WHEN has_5 > 0 AND has_10 > 0 THEN 'YES'
+        ELSE 'NO'
+    END AS coupon_eligible
+FROM grouped_orders
+WHERE 
+    (has_2 > 0 AND has_6 > 0) OR 
+    (has_4 > 0 AND has_9 > 0) OR 
+    (has_5 > 0 AND has_10 > 0);
 
